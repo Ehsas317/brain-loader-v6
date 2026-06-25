@@ -1,4 +1,4 @@
-# Brain Loader v6 — The Visual Mesh + Universal Bot Gateway
+# Mesh (formerly Brain Loader v6) — The Visual Mesh + Universal Bot Gateway
 
 > **One command.** Your entire AI team — brain, memory, skills, bots on 10+ platforms — running locally for free. No coding. Copy, paste, chat.
 
@@ -10,7 +10,7 @@
 
 ## Table of Contents
 
-- [What Makes v6 Different](#what-makes-v6-different)
+- [What Makes Mesh Different](#what-makes-mesh-different)
 - [The 6-Layer Stack](#the-6-layer-stack)
 - [Quick Start](#quick-start)
 - [System Requirements](#system-requirements)
@@ -25,9 +25,9 @@
 
 ---
 
-## What Makes v6 Different
+## What Makes Mesh Different
 
-| | v4 (Python) | v5 (Trio) | **v6 (Visual Mesh)** |
+| | v4 (Python) | v5 (Trio) | **v6 (Mesh)** |
 |---|---|---|---|
 | **Setup** | `pip install`, edit YAML | `pip install`, edit YAML | **One Docker command** |
 | **Orchestration** | Python classes | Trio nurseries | **Visual drag-and-drop** |
@@ -36,7 +36,7 @@
 | **For non-coders?** | ❌ | ❌ | **✅ Yes** |
 | **Unique factor** | Async router | Structured concurrency | **Visual mesh of real FOSS tools** |
 
-**v6 is not a Python program. It is a network of best-in-class open-source tools that talk to each other.** You are the conductor. The tools are the orchestra.
+**Mesh is not a Python program. It is a network of best-in-class open-source tools that talk to each other.** You are the conductor. The tools are the orchestra.
 
 ---
 
@@ -81,14 +81,14 @@ You need exactly **two things**:
 
 ```bash
 # Download and run the installer
-curl -fsSL https://raw.githubusercontent.com/Ehsas317/brain-loader-v6/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Ehsas317/mesh/main/install.sh | bash
 ```
 
 Or manually:
 
 ```bash
-git clone https://github.com/Ehsas317/brain-loader-v6.git
-cd brain-loader-v6
+git clone https://github.com/Ehsas317/mesh.git
+cd mesh
 bash install.sh
 ```
 
@@ -123,7 +123,7 @@ The installer will:
 
 **For 4GB RAM systems:** Run only Ollama + Flowise:
 ```bash
-cd ~/brain-loader-v6 && docker compose up -d ollama flowise
+cd ~/mesh && docker compose up -d ollama flowise
 ```
 
 ---
@@ -131,7 +131,7 @@ cd ~/brain-loader-v6 && docker compose up -d ollama flowise
 ## File Overview
 
 ```
-brain-loader-v6/
+mesh/
 ├── docker-compose.yml              ← Core mesh (6 services)
 ├── docker-compose.bots.yml         ← LangBot gateway (overlay)
 ├── docker-compose.n8n.yml          ← n8n automation (overlay)
@@ -193,7 +193,7 @@ brain-loader-v6/
 
 9. **Fixed install-bots.sh prerequisite validation**
    - **Original bug:** Would fail with confusing "network not found" errors if core mesh wasn't installed.
-   - **Fix:** Added explicit checks for: directory existence, docker-compose.yml existence, brain-mesh network existence, and Dify API running.
+   - **Fix:** Added explicit checks for: directory existence, docker-compose.yml existence, mesh network existence, and Dify API running.
 
 10. **Added input validation for all user prompts**
     - **Original bug:** No validation of MODE_CHOICE or PLATFORM_CHOICES input.
@@ -232,24 +232,24 @@ brain-loader-v6/
 
 ```bash
 # Start everything
-cd ~/brain-loader-v6 && docker compose up -d
+cd ~/mesh && docker compose up -d
 
 # Stop everything
-cd ~/brain-loader-v6 && docker compose down
+cd ~/mesh && docker compose down
 
 # View logs
-cd ~/brain-loader-v6 && docker compose logs -f
+cd ~/mesh && docker compose logs -f
 
 # Reset everything (DELETES ALL DATA — use with caution!)
-cd ~/brain-loader-v6 && docker compose down -v
+cd ~/mesh && docker compose down -v
 
 # Check service status
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 # View specific service logs
-docker logs brain-dify-api -f
-docker logs brain-ollama -f
-docker logs brain-postgres -f
+docker logs mesh-dify-api -f
+docker logs mesh-ollama -f
+docker logs mesh-postgres -f
 ```
 
 ---
@@ -259,7 +259,7 @@ docker logs brain-postgres -f
 After the core mesh is running, add chatbots with:
 
 ```bash
-cd ~/brain-loader-v6
+cd ~/mesh
 bash install-bots.sh
 ```
 
@@ -290,14 +290,14 @@ ports:
 ```bash
 # Check if Ollama is running
 docker compose ps
-docker compose logs brain-ollama
+docker compose logs mesh-ollama
 
 # Retry model download
-docker exec brain-ollama ollama pull llama3.2
+docker exec mesh-ollama ollama pull llama3.2
 ```
 
 ### "Dify won't connect to Ollama"
-**Fix:** In Dify → Settings → Model Providers → Ollama, use `http://brain-ollama:11434` (NOT localhost). Docker containers talk to each other by service name.
+**Fix:** In Dify → Settings → Model Providers → Ollama, use `http://mesh-ollama:11434` (NOT localhost). Docker containers talk to each other by service name.
 
 ### "Out of memory"
 **Fix:** Run minimal stack only:
