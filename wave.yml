@@ -1,31 +1,32 @@
-# =============================================================================
-# Brain Loader v6 — GitHub Actions Workflow
-# =============================================================================
-# INSTRUCTIONS: Move this file to .github/workflows/wave.yml to enable it.
-# The GitHub API prevents direct creation in .github/workflows/, so we
-# provide it here at root for you to move manually or via git.
 #
-# This workflow lets you run AI tasks on GitHub's free cloud computers
-# (2,000 minutes/month = ~33 hours).
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  MESH   — FILE: wave.yml                                                ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+#
+# PROJECT:    Mesh (formerly Brain Loader v6)
+# REPO:       https://github.com/Ehsas317/mesh
+# WHAT:       A network of nodes, not a single engine. Dockerized multi-node
+#             orchestration with Docker Compose mesh.
+#
+# THIS FILE:
+#   GitHub Actions workflow for cloud execution. Move to .github/workflows/
+#   to enable. FREE: 2,000 minutes/month (~33 hours of cloud compute).
 #
 # HOW TO USE:
-#   1. Move this file: mkdir -p .github/workflows && mv wave.yml .github/workflows/
-#   2. Push to GitHub: git add .github/workflows/wave.yml && git commit -m "Add workflow" && git push
-#   3. Go to GitHub → Actions → "Brain Wave Execution" → "Run workflow"
-#   4. Enter your goal/prompt and click "Run"
-#   5. Wait 2-3 minutes, see results
+#   1. mkdir -p .github/workflows && mv wave.yml .github/workflows/
+#   2. git add .github/workflows/wave.yml && git commit && git push
+#   3. Go to GitHub → Actions → "Mesh Wave Execution" → "Run workflow"
+#   4. Enter your goal and click "Run"
 #
-# COST: FREE (2,000 minutes/month = ~33 hours)
-# PRIVACY: Public — don't send sensitive data
-# =============================================================================
+# ═══════════════════════════════════════════════════════════════════════════
 
-name: Brain Wave Execution
+name: Mesh Wave Execution
 
 on:
   workflow_dispatch:
     inputs:
       goal:
-        description: 'What should the brain do?'
+        description: 'What should the mesh do?'
         required: true
         type: string
 
@@ -38,16 +39,8 @@ jobs:
 
       - name: Setup Ollama
         run: |
-          # Install Ollama using the official install script.
-          # 'curl -fsSL' is the SAFE way: -f=fail on HTTP error,
-          # -s=silent, -S=show errors, -L=follow redirects.
           curl -fsSL https://ollama.com/install.sh | sh
-
-          # Start Ollama server in background.
           ollama serve &
-
-          # Wait for Ollama API to be ready (poll instead of blind sleep).
-          # More reliable than 'sleep 5' — actually checks the server.
           for i in {1..30}; do
             if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
               echo "Ollama is ready!"
@@ -56,19 +49,13 @@ jobs:
             echo "Attempt $i/30..." >&2
             sleep 2
           done
-
-          # Download llama3.2 model (~4GB, takes 2-3 minutes on GitHub).
           ollama pull llama3.2
 
-      # CRITICAL SECURITY FIX: User input passed via env var prevents shell injection.
-      # If we used direct interpolation like "${{ inputs.goal }}", a malicious user
-      # could enter: "; rm -rf /; echo " and execute arbitrary commands.
-      # Environment variables are treated as DATA, not code — safe by design.
       - name: Execute Goal
         env:
           BRAIN_GOAL: ${{ github.event.inputs.goal }}
         run: |
-          echo "## 🧠 Brain Input" >> $GITHUB_STEP_SUMMARY
+          echo "## 🧠 Mesh Input" >> $GITHUB_STEP_SUMMARY
           echo "${BRAIN_GOAL}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 🤖 AI Response" >> $GITHUB_STEP_SUMMARY
