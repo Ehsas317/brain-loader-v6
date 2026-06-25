@@ -1,0 +1,64 @@
+# =============================================================================
+# Brain Loader v6 — Bot Gateway Extension (docker-compose.bots.yml)
+# =============================================================================
+# This overlay adds LangBot — a universal chatbot gateway that connects
+# your Dify workflows to Telegram, Discord, Slack, WhatsApp, and more.
+#
+# USAGE: Combine with the core compose file:
+#   docker compose -f docker-compose.yml -f docker-compose.bots.yml up -d
+#
+# The 'external: true' network reference means this file REQUIRES the core
+# docker-compose.yml to have been started first (to create 'brain-mesh').
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ===========================================================================
+  # SERVICE: langbot
+  # PURPOSE: Multi-platform chatbot adapter. One config, many platforms.
+  # LangBot receives messages from Telegram/Discord/Slack/WhatsApp, forwards
+  # them to your Dify workflow, and sends the reply back to the user.
+  # PORT: 5300 (Web UI for configuration at http://localhost:5300)
+  # ===========================================================================
+  langbot:
+    # 'latest' tag follows upstream releases. LangBot is actively maintained.
+    image: rockchin/langbot:latest
+    container_name: brain-langbot
+    ports:
+      - "5300:5300"
+    environment:
+      # Tell LangBot where to find its config files inside the container.
+      # These paths are INSIDE the container, mapped via volumes below.
+      - LANGBOT_CONFIG_PATH=/app/data/config
+      - LANGBOT_CONFIG_PROVIDER=yaml
+      - LANGBOT_PLUGIN_PATH=/app/data/plugins
+    volumes:
+      # Named volume persists LangBot config, chat history, and installed plugins.
+      - langbot-data:/app/data
+      # Bind mount for initial config files. ':ro' = read-only for safety.
+      # Place your config.yaml here on the host before starting.
+      - ./langbot-config:/app/data/config:ro
+    networks:
+      # Connect to the shared mesh network so LangBot can reach Dify API.
+      - brain-mesh
+    restart: unless-stopped
+    # CRITICAL: depends_on is NOT supported with 'condition' across compose
+    # files in Docker Compose < 2.20. We rely on the API being already up
+    # from the core compose file. If Dify restarts, LangBot will reconnect
+    # automatically (it has internal retry logic).
+    depends_on:
+      - dify-api
+
+volumes:
+  # Persistent storage for LangBot configuration and plugin data.
+  langbot-data:
+
+networks:
+  # 'external: true' means we reference an EXISTING network created by the
+  # core docker-compose.yml. This is the KEY pattern for compose overlays.
+  # If you see "network brain-mesh not found", start the core mesh first:
+  #   docker compose -f docker-compose.yml up -d
+  brain-mesh:
+    external: true
+    name: brain-mesh

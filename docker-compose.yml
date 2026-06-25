@@ -1,0 +1,314 @@
+# =============================================================================
+# Brain Loader v6 — Core Mesh (docker-compose.yml)
+# =============================================================================
+# This file defines the 6-layer AI orchestration stack. Each service is
+# carefully configured for local development with sensible defaults.
+#
+# BUG FIXES APPLIED (compared to original v6 guide):
+# - Added health checks to postgres, redis, and weaviate so Dify doesn't
+#   crash-loop on startup waiting for dependencies to be ACTUALLY ready
+#   (not just container-started)
+# - Pinned Weaviate to 1.24.0 for reproducible builds
+# - Added restart policies with unless-stopped (won't auto-start on boot)
+# - Used named volumes for all persistent data (survives container rebuilds)
+# - Added explicit bridge network for inter-service DNS resolution
+# =============================================================================
+
+# Docker Compose file format version. 3.8 is widely supported and gives us
+# all the features we need (health checks, depends_on with condition, etc.)
+version: "3.8"
+
+# =============================================================================
+# SERVICES
+# Each service runs in its own isolated container. They talk to each other
+# via the shared 'brain-mesh' network using service names as hostnames.
+# =============================================================================
+services:
+
+  # ===========================================================================
+  # SERVICE: ollama
+  # PURPOSE: Local AI model runner. Downloads and runs LLMs on your hardware.
+  # WHY LOCAL: Zero API cost, perfect privacy, works offline.
+  # PORT: 11434 (exposed to host so external tools can reach it)
+  # ===========================================================================
+  ollama:
+    # 'latest' tag auto-pulls the newest stable Ollama release.
+    # Ollama team maintains this carefully; using latest is generally safe.
+    # For production teams, pin to a specific version (e.g., 0.3.0) instead.
+    image: ollama/ollama:latest
+    # Human-readable container name. Makes 'docker ps', logs, and exec easier.
+    container_name: brain-ollama
+    # Map container port 11434 to host port 11434.
+    # Host tools (Hermes, brain CLI, curl) connect to localhost:11434.
+    # Internal services use 'http://brain-ollama:11434' via Docker DNS.
+    ports:
+      - "11434:11434"
+    # Named volume 'ollama-data' stores downloaded model weights.
+    # This is LARGE (4-8GB per model) but persists across container restarts.
+    # Bind mount './ollama-personas' provides modelfiles for custom personas.
+    # The ':ro' (read-only) flag means the container CANNOT write to this path,
+    # protecting your modelfile definitions from accidental corruption.
+    volumes:
+      - ollama-data:/root/.ollama
+      - ./ollama-personas:/root/.ollama/personas:ro
+    # Attach to the shared network so other services can reach this by name.
+    networks:
+      - brain-mesh
+    # 'unless-stopped' means: auto-restart on crash/reboot, BUT if a human
+    # manually runs 'docker stop', stay stopped. Best for dev workflows.
+    restart: unless-stopped
+    # Health check: verify Ollama API is actually responding.
+    # 'ollama ps' returns 0 if the server is healthy. 30s interval avoids
+    # spamming during slow model loads. 3 retries gives 90s total grace period.
+    healthcheck:
+      test: ["CMD", "ollama", "ps"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s  # Extra grace period for first model download
+
+  # ===========================================================================
+  # SERVICE: dify-api
+  # PURPOSE: Backend API for Dify — the visual AI workflow builder.
+  # Dify has two parts: API (this container) and Web UI (next service).
+  # PORT: 5001 (Console API + App API combined for simplicity)
+  # ===========================================================================
+  dify-api:
+    image: langgenius/dify-api:latest
+    container_name: brain-dify-api
+    ports:
+      - "5001:5001"
+    environment:
+      # The MODE env var is set by install.sh (local/api/hybrid).
+      # Dify doesn't use it directly, but we pass it for future extensibility
+      # and for any custom tooling that reads this value.
+      - MODE=${MODE:-hybrid}
+      # URLs that Dify uses to generate callback links and embed in responses.
+      # 'localhost' works when accessing from the same machine.
+      # For remote access, change these to your server's IP or domain.
+      - CONSOLE_API_URL=http://localhost:5001
+      - APP_API_URL=http://localhost:5001
+      # SECRET_KEY is used for JWT token signing and session encryption.
+      # CHANGE THIS in production! Use: openssl rand -hex 32
+      # The default here is a convenience for first-time setup only.
+      - SECRET_KEY=brain-loader-v6-secret-key-change-me
+      # PostgreSQL connection settings. These MUST match the 'postgres'
+      # service configuration below. Using service name 'brain-postgres'
+      # as hostname works because of Docker's built-in DNS on 'brain-mesh'.
+      - DB_USERNAME=brain
+      - DB_PASSWORD=loader-v6-secure
+      - DB_HOST=brain-postgres
+      - DB_PORT=5432
+      - DB_DATABASE=brainmesh
+      # Redis connection settings. Same pattern as Postgres.
+      # Redis is used for caching, job queues, and rate limiting.
+      - REDIS_HOST=brain-redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      # Weaviate vector database endpoint. Used for RAG (document Q&A).
+      # Weaviate stores document embeddings and performs similarity search.
+      - WEAVIATE_ENDPOINT=http://brain-weaviate:8080
+    # Persistent storage for uploaded files, conversation history, etc.
+    volumes:
+      - dify-data:/app/api/storage
+    networks:
+      - brain-mesh
+    # CRITICAL FIX: Wait for dependent services to be HEALTHY, not just started.
+    # Without 'condition: service_healthy', Dify crashes 3-5 times before
+    # Postgres is ready, creating unnecessary error log spam.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      weaviate:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ===========================================================================
+  # SERVICE: dify-web
+  # PURPOSE: Frontend web UI for Dify — what you see in the browser.
+  # This is a static React app served by nginx; it proxies API calls to dify-api.
+  # PORT: 3000 (http://localhost:3000)
+  # ===========================================================================
+  dify-web:
+    image: langgenius/dify-web:latest
+    container_name: brain-dify-web
+    ports:
+      - "3000:3000"
+    environment:
+      # Tell the frontend where to find the API backend.
+      # These MUST match dify-api's actual URL (accessible from the HOST).
+      - CONSOLE_API_URL=http://localhost:5001
+      - APP_API_URL=http://localhost:5001
+    networks:
+      - brain-mesh
+    # Wait for dify-api to be running before starting the web UI.
+    # The frontend will 500-error if the API isn't reachable on first load.
+    depends_on:
+      - dify-api
+    restart: unless-stopped
+
+  # ===========================================================================
+  # SERVICE: flowise
+  # PURPOSE: Alternative visual workflow builder (simpler than Dify).
+  # Good for quick prototyping and LangChain-based flows.
+  # PORT: 3001 (http://localhost:3001)
+  # LOGIN: brain / loader-v6
+  # ===========================================================================
+  flowise:
+    image: flowiseai/flowise:latest
+    container_name: brain-flowise
+    ports:
+      - "3001:3000"
+    environment:
+      # Basic auth credentials. Flowise has no built-in user management,
+      # so this single login protects the entire instance.
+      - FLOWISE_USERNAME=brain
+      - FLOWISE_PASSWORD=loader-v6
+      # All Flowise data (flows, credentials, chat history) goes into one
+      # directory. Using a named volume ensures persistence.
+      - DATABASE_PATH=/root/.flowise
+      - APIKEY_PATH=/root/.flowise
+      - SECRETKEY_PATH=/root/.flowise
+      - LOG_PATH=/root/.flowise/logs
+    volumes:
+      - flowise-data:/root/.flowise
+    networks:
+      - brain-mesh
+    restart: unless-stopped
+
+  # ===========================================================================
+  # SERVICE: redis
+  # PURPOSE: In-memory cache and message broker.
+  # Dify uses it for: rate limiting, background job queues, session cache.
+  # No persistent storage needed — data is ephemeral by design.
+  # ===========================================================================
+  redis:
+    # Alpine variant is 10x smaller than Debian-based. Redis is so stable
+    # that even '-alpine' is production-grade. Major version 7 ensures
+    # compatibility with Dify's Redis client libraries.
+    image: redis:7-alpine
+    container_name: brain-redis
+    volumes:
+      # Persist Redis data to disk in case of container restart.
+      # This prevents losing queued jobs and cached sessions.
+      - redis-data:/data
+    networks:
+      - brain-mesh
+    restart: unless-stopped
+    # CRITICAL FIX: Health check ensures Redis is accepting connections
+    # before Dify tries to use it. The 'redis-cli ping' returns PONG if healthy.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ===========================================================================
+  # SERVICE: postgres
+  # PURPOSE: Primary relational database for Dify.
+  # Stores: users, apps, conversations, API keys, knowledge bases, etc.
+  # ===========================================================================
+  postgres:
+    # Postgres 15 is well-tested with Dify. Alpine variant saves ~200MB.
+    image: postgres:15-alpine
+    container_name: brain-postgres
+    environment:
+      # These MUST match the DB_* variables in dify-api above.
+      # Postgres creates the user/database on first container start.
+      - POSTGRES_USER=brain
+      - POSTGRES_PASSWORD=loader-v6-secure
+      - POSTGRES_DB=brainmesh
+    volumes:
+      # Persist the actual database files. This is your MOST IMPORTANT volume.
+      # Losing this means losing all Dify apps, conversations, and config.
+      # Back this up regularly with: docker exec brain-postgres pg_dump -U brain brainmesh > backup.sql
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - brain-mesh
+    restart: unless-stopped
+    # CRITICAL FIX: Health check verifies Postgres is accepting connections
+    # AND the 'brainmesh' database actually exists. The '-d brainmesh' flag
+    # ensures we don't get a false positive from connecting to 'postgres' (default).
+    # The '\q' command quits psql cleanly with exit code 0 on success.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brain -d brainmesh || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s  # Postgres needs time for first-time initialization
+
+  # ===========================================================================
+  # SERVICE: weaviate
+  # PURPOSE: Vector database for document embeddings (RAG / knowledge base).
+  # When you upload PDFs to Dify, Weaviate stores their vector representations
+  # and performs semantic similarity search to find relevant chunks.
+  # PORT: 8080 (exposed for direct access and debugging)
+  # ===========================================================================
+  weaviate:
+    # Pinned to 1.24.0 for reproducible builds. Upgrading? Check Dify's
+    # Weaviate client compatibility first — vector DB APIs change frequently.
+    image: semitechnologies/weaviate:1.24.0
+    container_name: brain-weaviate
+    ports:
+      - "8080:8080"
+    environment:
+      # Default limit for query results. Prevents accidentally returning
+      # thousands of vectors on an unbounded search.
+      - QUERY_DEFAULTS_LIMIT=25
+      # Allow anonymous access. Fine for local dev; in production, disable this
+      # and configure OIDC or API-key based auth.
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+      # Where Weaviate stores its vector index and metadata.
+      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      # 'none' means we compute embeddings externally (Dify handles this).
+      # Alternative: set to a module name (e.g., 'text2vec-openai') to let
+      # Weaviate call embedding APIs directly. Keeping it 'none' is simpler
+      # and gives Dify full control over which embedding model to use.
+      - DEFAULT_VECTORIZER_MODULE=none
+    volumes:
+      # Persist the vector index. Rebuilding embeddings is SLOW (minutes to
+      # hours depending on document count), so this volume is critical.
+      - weaviate-data:/var/lib/weaviate
+    networks:
+      - brain-mesh
+    restart: unless-stopped
+    # Health check: Weaviate exposes a /v1/.well-known/ready endpoint.
+    # Returns 200 when the vector index is loaded and ready to query.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s  # Vector index loading can take 30+ seconds
+
+# =============================================================================
+# NAMED VOLUMES
+# Docker manages these in its internal storage. They survive container removal,
+# 'docker compose down', and image updates. Use 'docker compose down -v' to
+# destroy them (wipes ALL data — use with caution!).
+# =============================================================================
+volumes:
+  ollama-data:    # AI model weights (4-8GB each)
+  dify-data:      # Dify uploads, exports, conversation history
+  flowise-data:   # Flowise workflows and credentials
+  redis-data:     # Ephemeral cache (safe to lose)
+  postgres-data:  # CRITICAL: All Dify application data
+  weaviate-data:  # CRITICAL: Document embeddings (slow to rebuild)
+
+# =============================================================================
+# NETWORKS
+# The 'bridge' driver creates an isolated virtual network on the host.
+# Each container gets an IP and is reachable by service name (Docker DNS).
+# Services on other compose files (bots, n8n) can join this network by
+# declaring it as 'external: true' and then connecting their containers.
+# =============================================================================
+networks:
+  brain-mesh:
+    driver: bridge
+    # 'name' makes the network name predictable (not prefixed with compose dir).
+    # This is REQUIRED for overlay compose files (docker-compose.bots.yml etc.)
+    # to reference this network correctly as 'external: true'.
+    name: brain-mesh

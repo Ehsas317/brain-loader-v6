@@ -1,0 +1,52 @@
+# =============================================================================
+# Brain Loader v6 — WhatsApp Business Extension (docker-compose.whatsapp.yml)
+# =============================================================================
+# This overlay adds WPPConnect — a WhatsApp Web automation server.
+# It provides a REST API to send/receive WhatsApp messages programmatically.
+#
+# IMPORTANT: This is for BUSINESS/PRODUCTION WhatsApp use.
+# For personal WhatsApp (just playing around), use LangBot's built-in
+# WhatsApp Web adapter instead — it's simpler and doesn't need this container.
+#
+# USAGE: docker compose -f docker-compose.yml -f docker-compose.whatsapp.yml up -d
+# Then open http://localhost:21465 and scan the QR code.
+# =============================================================================
+
+version: "3.8"
+
+services:
+  whatsapp:
+    # WPPConnect wraps WhatsApp Web in a headless Chrome + REST API.
+    # It maintains a persistent WebSocket connection to WhatsApp servers.
+    image: wppconnect/wppconnect-server:latest
+    container_name: brain-whatsapp
+    ports:
+      - "21465:21465"
+    environment:
+      # Secret key for WPPConnect's internal JWT token generation.
+      # Used to authenticate API calls to the Whatsapp server itself.
+      # CHANGE THIS for production deployments!
+      - SECRET_KEY=brain-loader-v6-whatsapp-change-me
+      # Port the server listens on inside the container.
+      - PORT=21465
+      # Run in production mode (less verbose logging, better performance).
+      - NODE_ENV=production
+    volumes:
+      # Persist WhatsApp Web session data (QR auth tokens, message history).
+      # Without this, you'd need to re-scan the QR code on every restart.
+      - whatsapp-data:/usr/src/wpp-server
+    networks:
+      - brain-mesh
+    restart: unless-stopped
+    # NOTE: WPPConnect requires significant resources:
+    # - RAM: 1GB+ (it runs a headless Chrome instance)
+    # - CPU: Moderate (constant WebSocket encryption)
+    # If your machine has < 8GB total RAM, consider skipping this service.
+
+volumes:
+  whatsapp-data:
+
+networks:
+  brain-mesh:
+    external: true
+    name: brain-mesh
