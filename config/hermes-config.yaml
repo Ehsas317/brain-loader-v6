@@ -1,0 +1,36 @@
+# =============================================================================
+# Brain Loader v6 — Hermes Agent Configuration Template
+# =============================================================================
+# Hermes is a headless AI task executor from Nous Research. It reads skills
+# from markdown files and executes them via your Ollama instance.
+#
+# SETUP:
+#   1. Copy this file to ~/.hermes/config.yaml (on your host, NOT in Docker)
+#   2. Replace YOUR_BOT_TOKEN_HERE with your actual Telegram bot token
+#   3. Run: hermes
+# =============================================================================
+
+model:
+  # 'provider: ollama' means we use a local Ollama instance.
+  provider: ollama
+  # 'base_url' is the Ollama API endpoint. 'localhost' works when Hermes
+  # runs on the SAME machine as Ollama (Hermes is NOT containerized).
+  base_url: http://localhost:11434
+  # 'brain-planner' is our custom persona. Use any Ollama model.
+  model: brain-planner
+
+gateway:
+  telegram:
+    # Your Telegram Bot API token from @BotFather.
+    # It looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+    # ⚠️  KEEP THIS SECRET! Anyone with your token can control your bot.
+    token: "YOUR_BOT_TOKEN_HERE"
+    # 'allowed_chats' restricts which chats can control Hermes.
+    # Empty list [] = anyone can send commands (not recommended for public bots).
+    # To restrict, add your chat IDs: [123456789, 987654321]
+    allowed_chats: []
+
+skills:
+  external_dirs:
+    # Path to your custom skills directory.
+    - ~/brain-loader-v6/skills
