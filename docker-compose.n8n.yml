@@ -1,53 +1,51 @@
-# =============================================================================
-# Brain Loader v6 — n8n Automation Extension (docker-compose.n8n.yml)
-# =============================================================================
-# This overlay adds n8n — a visual workflow automation tool like Zapier
-# but self-hosted and open-source. Use it to build custom bot logic, data
-# pipelines, and integrations without writing code.
 #
-# USAGE: docker compose -f docker-compose.yml -f docker-compose.n8n.yml up -d
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  MESH   — FILE: docker-compose.n8n.yml                                  ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 #
-# n8n has native nodes for: Telegram, Discord, Slack, WhatsApp, HTTP requests,
-# webhooks, databases, email, and 400+ other integrations.
-# =============================================================================
+# PROJECT:    Mesh (formerly Brain Loader v6)
+# REPO:       https://github.com/Ehsas317/mesh
+# WHAT:       A network of nodes, not a single engine. Dockerized multi-node
+#             orchestration with Docker Compose mesh.
+#
+# THIS FILE:
+#   n8n automation overlay. Visual workflow builder for connecting
+n#   your Dify brain to any platform.
+#
+# HOW TO USE:
+#   cd ~/mesh && docker compose -f docker-compose.yml -f docker-compose.n8n.yml up -d
+#
+# ═══════════════════════════════════════════════════════════════════════════
 
 version: "3.8"
 
 services:
   n8n:
-    # n8n follows a "fair-code" license — free for self-hosted use.
     image: n8nio/n8n:latest
-    container_name: brain-n8n
+    container_name: mesh-n8n
     ports:
       - "5678:5678"
     environment:
-      # Enable basic authentication for the n8n web UI.
-      # There is NO built-in user system in n8n; this is the only protection.
-      # CHANGE THIS PASSWORD for any non-local deployment!
       - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=brain
-      - N8N_BASIC_AUTH_PASSWORD=loader-v6-n8n
-      # This URL is used in generated webhook URLs. MUST be reachable from
-      # the internet if you use Telegram/Slack webhooks (they call YOU).
-      # For local-only testing, localhost is fine.
-      - WEBHOOK_URL=http://localhost:5678
-      # Encryption key for credential storage. n8n encrypts API keys and
-      # passwords using AES-256. This key MUST be the same across restarts
-      # or all credentials become unreadable!
-      # CHANGE THIS! Generate with: openssl rand -hex 32
-      - N8N_ENCRYPTION_KEY=brain-loader-v6-encrypt-key-change-me
+      - N8N_BASIC_AUTH_USER=mesh
+      - N8N_BASIC_AUTH_PASSWORD=mesh-secure
+      - N8N_ENCRYPTION_KEY=mesh-encryption-key-change-me
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=mesh-postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=mesh
+      - DB_POSTGRESDB_PASSWORD=mesh-secure
     volumes:
-      # Persist ALL n8n data: workflows, credentials, execution history.
-      # This is your most important n8n volume — back it up!
       - n8n-data:/home/node/.n8n
     networks:
-      - brain-mesh
+      - mesh-net
     restart: unless-stopped
 
 volumes:
   n8n-data:
 
+# This overlay extends the mesh-net network from docker-compose.yml
 networks:
-  brain-mesh:
+  mesh-net:
     external: true
-    name: brain-mesh
