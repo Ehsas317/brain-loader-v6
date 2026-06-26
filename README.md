@@ -1,4 +1,4 @@
-# Mesh (formerly Brain Loader v6) — The Visual Mesh + Universal Bot Gateway
+# Brain Loader v6 — The Visual Mesh + Universal Bot Gateway
 
 > **One command.** Your entire AI team — brain, memory, skills, bots on 10+ platforms — running locally for free. No coding. Copy, paste, chat.
 
