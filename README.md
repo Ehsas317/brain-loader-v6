@@ -1,4 +1,4 @@
-# Brain Loader v6 — The Visual Mesh + Universal Bot Gateway
+# Mesh — The Visual Mesh + Universal Bot Gateway
 
 > **One command.** Your entire AI team — brain, memory, skills, bots on 10+ platforms — running locally for free. No coding. Copy, paste, chat.
 
@@ -99,7 +99,7 @@ The installer will:
 4. ⬇️ Download all AI tools (3-5 minutes on first run)
 5. 🚀 Start all services with health checks
 6. 🎭 Create AI personas (planner, coder, researcher, critic)
-7. 🧠 Optionally install brain CLI and Hermes Agent
+7. 🧠 Optionally install mesh CLI and Hermes Agent
 
 ### After Install — Your Services
 
