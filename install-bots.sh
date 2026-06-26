@@ -1,13 +1,13 @@
 #!/bin/bash
 # =============================================================================
-# Brain Loader v6 — Universal Bot Gateway Installer (install-bots.sh)
+# Mesh — Universal Bot Gateway Installer (install-bots.sh)
 # =============================================================================
-# This script adds multi-platform chatbot capabilities to your Brain Loader mesh.
+# This script adds multi-platform chatbot capabilities to your Mesh.
 # It installs LangBot (multi-platform adapter), n8n (visual automation), and/or
 # WhatsApp Business gateway based on your selection.
 #
 # PREREQUISITE: You MUST run install.sh FIRST to create the core mesh and
-# the 'brain-mesh' Docker network. This script depends on that infrastructure.
+# the 'mesh-net' Docker network. This script depends on that infrastructure.
 #
 # PLATFORMS SUPPORTED:
 #   • Telegram  — Easiest setup. Message @BotFather for a free bot token.
@@ -19,7 +19,7 @@
 # BUG FIXES IN THIS VERSION:
 #   - Added validation that core mesh exists before proceeding
 #   - Auto-detects 'docker compose' vs 'docker-compose' (same as install.sh)
-#   - Validates that 'brain-mesh' network exists (created by core install)
+#   - Validates that 'mesh-net' network exists (created by core install)
 #   - Added input validation for PLATFORM_CHOICES
 #   - Fixed COMPOSE_FILES building (intentional unquoted word splitting)
 #   - Added non-zero exit codes on actual errors (vs silent failures)
@@ -47,7 +47,7 @@ NC='\033[0m'
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-BRAIN_DIR="$HOME/brain-loader-v6"
+MESH_DIR="$HOME/mesh"
 DOCKER_COMPOSE=""
 
 # ---------------------------------------------------------------------------
@@ -91,14 +91,14 @@ command_exists() {
 # ---------------------------------------------------------------------------
 # CRITICAL VALIDATION: This script REQUIRES the core mesh to exist first.
 # The core install.sh creates:
-#   1. $BRAIN_DIR directory
+#   1. $MESH_DIR directory
 #   2. docker-compose.yml file
-#   3. 'brain-mesh' Docker network
+#   3. 'mesh-net' Docker network
 # Without these, the bot compose files will fail to start.
 
-# Check 1: Does the Brain Loader directory exist?
-if [ ! -d "$BRAIN_DIR" ]; then
-    print_error "brain-loader-v6 directory not found at $BRAIN_DIR.
+# Check 1: Does the Mesh directory exist?
+if [ ! -d "$MESH_DIR" ]; then
+    print_error "mesh directory not found at $MESH_DIR.
 
    You must run the core installer FIRST:
        bash install.sh
@@ -106,12 +106,12 @@ if [ ! -d "$BRAIN_DIR" ]; then
    This creates the required infrastructure (network, volumes, base services)."
 fi
 
-# Change to the Brain Loader directory. All subsequent paths are relative.
-cd "$BRAIN_DIR"
+# Change to the Mesh directory. All subsequent paths are relative.
+cd "$MESH_DIR"
 
 # Check 2: Does the core docker-compose.yml exist?
 if [ ! -f "docker-compose.yml" ]; then
-    print_error "Core docker-compose.yml not found in $BRAIN_DIR.
+    print_error "Core docker-compose.yml not found in $MESH_DIR.
 
    Your installation may be incomplete. Please re-run:
        bash install.sh"
@@ -137,22 +137,22 @@ if ! docker info &> /dev/null; then
    • WSL2:        wsl.exe -d docker-desktop"
 fi
 
-# Check 5: Does the 'brain-mesh' network exist?
-# The core docker-compose.yml defines 'networks: brain-mesh' with 'name: brain-mesh'.
+# Check 5: Does the 'mesh-net' network exist?
+# The core docker-compose.yml defines 'networks: mesh-net' with 'name: mesh-net'.
 # Bot compose files reference this as 'external: true'. If it doesn't exist,
 # 'docker compose up' will fail with a confusing network error.
-if ! docker network ls --format '{{.Name}}' | grep -q '^brain-mesh$'; then
-    print_error "The 'brain-mesh' Docker network does not exist.
+if ! docker network ls --format '{{.Name}}' | grep -q '^mesh-net$'; then
+    print_error "The 'mesh-net' Docker network does not exist.
 
    This means the core mesh was never started. Please run:
-       cd $BRAIN_DIR && $DOCKER_COMPOSE up -d
+       cd $MESH_DIR && $DOCKER_COMPOSE up -d
 
    Then re-run this bot installer."
 fi
 
 # Check 6: Are the core services running?
 # We check Dify API specifically since LangBot and n8n need to connect to it.
-if ! docker ps --format '{{.Names}}' | grep -q '^brain-dify-api$'; then
+if ! docker ps --format '{{.Names}}' | grep -q '^mesh-dify-api$'; then
     print_warning "Dify API is not running. Starting core services first..."
     $DOCKER_COMPOSE up -d
     # Give services a moment to start. The '|| true' handles race conditions.
@@ -162,7 +162,7 @@ fi
 # =============================================================================
 # WELCOME BANNER
 # =============================================================================
-print_banner "$CYAN" "🤖 BRAIN LOADER v6 — Universal Bot Gateway" "Add Telegram, Discord, Slack, WhatsApp & More"
+print_banner "$CYAN" "🤖 MESH — Universal Bot Gateway" "Add Telegram, Discord, Slack, WhatsApp & More"
 
 # =============================================================================
 # PLATFORM SELECTION
@@ -219,7 +219,7 @@ print_step "Creating bot gateway files..."
 # ---------------------------------------------------------------------------
 if echo "$PLATFORM_CHOICES" | grep -qE "1|2|3|4|6"; then
     # Write the LangBot docker compose overlay.
-    # The '\'EOF\'' (quoted delimiter) prevents shell variable expansion.
+    # The '\EOF\'' (quoted delimiter) prevents shell variable expansion.
     # This is SAFE because the compose file has no shell variables to expand.
     cat > docker-compose.bots.yml << 'EOF'
 version: "3.8"
@@ -227,7 +227,7 @@ version: "3.8"
 services:
   langbot:
     image: rockchin/langbot:latest
-    container_name: brain-langbot
+    container_name: mesh-langbot
     ports:
       - "5300:5300"
     environment:
@@ -238,7 +238,7 @@ services:
       - langbot-data:/app/data
       - ./langbot-config:/app/data/config:ro
     networks:
-      - brain-mesh
+      - mesh-net
     restart: unless-stopped
     depends_on:
       - dify-api
@@ -247,9 +247,9 @@ volumes:
   langbot-data:
 
 networks:
-  brain-mesh:
+  mesh-net:
     external: true
-    name: brain-mesh
+    name: mesh-net
 EOF
     print_success "LangBot config created (docker-compose.bots.yml)"
 fi
@@ -265,28 +265,28 @@ version: "3.8"
 services:
   n8n:
     image: n8nio/n8n:latest
-    container_name: brain-n8n
+    container_name: mesh-n8n
     ports:
       - "5678:5678"
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=brain
-      - N8N_BASIC_AUTH_PASSWORD=loader-v6-n8n
+      - N8N_BASIC_AUTH_USER=mesh
+      - N8N_BASIC_AUTH_PASSWORD=mesh-n8n
       - WEBHOOK_URL=http://localhost:5678
-      - N8N_ENCRYPTION_KEY=brain-loader-v6-encrypt-key-change-me
+      - N8N_ENCRYPTION_KEY=mesh-n8n-encrypt-key-change-me
     volumes:
       - n8n-data:/home/node/.n8n
     networks:
-      - brain-mesh
+      - mesh-net
     restart: unless-stopped
 
 volumes:
   n8n-data:
 
 networks:
-  brain-mesh:
+  mesh-net:
     external: true
-    name: brain-mesh
+    name: mesh-net
 EOF
     print_success "n8n config created (docker-compose.n8n.yml)"
 fi
@@ -302,26 +302,26 @@ version: "3.8"
 services:
   whatsapp:
     image: wppconnect/wppconnect-server:latest
-    container_name: brain-whatsapp
+    container_name: mesh-whatsapp
     ports:
       - "21465:21465"
     environment:
-      - SECRET_KEY=brain-loader-v6-whatsapp-change-me
+      - SECRET_KEY=mesh-whatsapp-change-me
       - PORT=21465
       - NODE_ENV=production
     volumes:
       - whatsapp-data:/usr/src/wpp-server
     networks:
-      - brain-mesh
+      - mesh-net
     restart: unless-stopped
 
 volumes:
   whatsapp-data:
 
 networks:
-  brain-mesh:
+  mesh-net:
     external: true
-    name: brain-mesh
+    name: mesh-net
 EOF
     print_success "WhatsApp config created (docker-compose.whatsapp.yml)"
 fi
@@ -376,7 +376,7 @@ if echo "$PLATFORM_CHOICES" | grep -qE "1|6"; then
     echo "   3. Open http://localhost:5300 in your browser"
     echo "   4. Go to Pipelines → ChatPipeline → AI Capability"
     echo "   5. Set Runner to 'Dify Service API'"
-    echo "   6. Base URL: http://brain-dify-api:5001/v1"
+    echo "   6. Base URL: http://mesh-dify-api:5001/v1"
     echo "   7. Get API Key from Dify → Your App → Access API → Create Key"
     echo "   8. Go to Platform Adapters → Telegram → Paste token → Enable"
     echo "   9. Message your bot on Telegram — it will respond via Dify!"
@@ -432,12 +432,12 @@ fi
 if echo "$PLATFORM_CHOICES" | grep -qE "5|6"; then
     echo -e "${BOLD}${GREEN}🔧 n8n Visual Builder Setup:${NC}"
     echo "   1. Open http://localhost:5678"
-    echo "   2. Login: brain / loader-v6-n8n"
+    echo "   2. Login: mesh / mesh-n8n"
     echo "   3. Click 'Add Workflow'"
     echo "   4. Add a Trigger node (Telegram Trigger / Discord Trigger / Webhook)"
     echo "   5. Add an HTTP Request node to call Dify:"
     echo "      • Method: POST"
-    echo "      • URL: http://brain-dify-api:5001/v1/chat-messages"
+    echo "      • URL: http://mesh-dify-api:5001/v1/chat-messages"
     echo "      • Headers: Authorization: Bearer YOUR_DIFY_API_KEY"
     echo "   6. Add a Send Message node to reply"
     echo "   7. Connect nodes → Save → Activate"
@@ -448,11 +448,11 @@ fi
 # DAILY COMMANDS
 # =============================================================================
 echo -e "${BOLD}${YELLOW}⚡ Quick Commands:${NC}"
-echo "   View LangBot logs:   docker logs brain-langbot -f"
-echo "   View n8n logs:       docker logs brain-n8n -f"
-echo "   View WhatsApp logs:  docker logs brain-whatsapp -f"
-echo "   Stop all bots:       cd $BRAIN_DIR && $DOCKER_COMPOSE $COMPOSE_FILES down"
-echo "   Restart:             cd $BRAIN_DIR && $DOCKER_COMPOSE $COMPOSE_FILES restart"
+echo "   View LangBot logs:   docker logs mesh-langbot -f"
+echo "   View n8n logs:       docker logs mesh-n8n -f"
+echo "   View WhatsApp logs:  docker logs mesh-whatsapp -f"
+echo "   Stop all bots:       cd $MESH_DIR && $DOCKER_COMPOSE $COMPOSE_FILES down"
+echo "   Restart:             cd $MESH_DIR && $DOCKER_COMPOSE $COMPOSE_FILES restart"
 echo "   Check all services:  docker ps --format 'table {{.Names}}\t{{.Status}}'"
 echo ""
 
