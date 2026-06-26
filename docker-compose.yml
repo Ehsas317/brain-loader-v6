@@ -29,6 +29,7 @@
 # - Added restart policies with unless-stopped
 # - Used named volumes for all persistent data
 # - Added explicit bridge network for inter-service DNS resolution
+# - SECRETS NOW USE ENVIRONMENT VARIABLES — set in .env or export before running
 # =============================================================================
 
 version: "3.8"
@@ -61,9 +62,9 @@ services:
       - MODE=${MODE:-hybrid}
       - CONSOLE_API_URL=http://localhost:5001
       - APP_API_URL=http://localhost:5001
-      - SECRET_KEY=mesh-secret-key-change-me
+      - SECRET_KEY=${MESH_SECRET_KEY:-mesh-secret-key-change-me}
       - DB_USERNAME=mesh
-      - DB_PASSWORD=mesh-secure
+      - DB_PASSWORD=${MESH_DB_PASSWORD:-mesh-secure}
       - DB_HOST=mesh-postgres
       - DB_PORT=5432
       - DB_DATABASE=meshdb
@@ -105,7 +106,7 @@ services:
       - "3001:3000"
     environment:
       - FLOWISE_USERNAME=mesh
-      - FLOWISE_PASSWORD=mesh-pass
+      - FLOWISE_PASSWORD=${MESH_FLOWISE_PASSWORD:-mesh-pass}
       - DATABASE_PATH=/root/.flowise
       - APIKEY_PATH=/root/.flowise
       - SECRETKEY_PATH=/root/.flowise
@@ -136,7 +137,7 @@ services:
     container_name: mesh-postgres
     environment:
       - POSTGRES_USER=mesh
-      - POSTGRES_PASSWORD=mesh-secure
+      - POSTGRES_PASSWORD=${MESH_POSTGRES_PASSWORD:-mesh-secure}
       - POSTGRES_DB=meshdb
     volumes:
       - postgres-data:/var/lib/postgresql/data
